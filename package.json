@@ -21,6 +21,7 @@
   "author": "Sam Holmes",
   "license": "BSD",
   "dependencies": {
-    "cheerio": "^0.17.0"
+    "cheerio": "^0.17.0",
+  "charset-converter": "0.0.4"
   }
 }

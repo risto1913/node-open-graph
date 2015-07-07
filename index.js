@@ -1,7 +1,7 @@
 var http = require('http'),
 	https = require('https'),
 	cheerio = require('cheerio');
-
+var converter = require("charset-converter");
 
 var shorthandProperties = {
 	"image": "image:url",
@@ -13,7 +13,7 @@ var shorthandProperties = {
 module.exports = function(url, cb, options){
 	exports.getHTML(url, function(err, html){
 		if (err) return cb(err);
-		
+
 		cb(null, exports.parse(html, options));
 	})
 }
@@ -21,25 +21,28 @@ module.exports = function(url, cb, options){
 
 exports.getHTML = function(url, cb){
 	var purl = require('url').parse(url);
-	
+
 	if (!purl.protocol)
 		purl = require('url').parse("http://"+url);
-	
+
 	var httpModule = purl.protocol === 'https:'
 		? https
 		: http;
-	
+
 	url = require('url').format(purl);
-	
+
 	var client = httpModule.get(url, function(res){
-		res.setEncoding('utf-8');
-		
+		//res.setEncoding('utf-8');
+
 		var html = "";
-		
+
 		res.on('data', function(data){
-			html += data;
+			//console.log(converter.convert('iso-8859-1',data));
+			html += converter.convert('iso-8859-1',data);
 		});
-		
+
+
+
 		res.on('end', function(){
 			if (res.statusCode >= 300 && res.statusCode < 400)
 			{
@@ -49,10 +52,10 @@ exports.getHTML = function(url, cb){
 			{
 				cb(null, html);
 			}
-			
+
 		});
 	});
-	
+
 	client.on('error', function(err){
 		cb(err);
 	})
@@ -61,21 +64,21 @@ exports.getHTML = function(url, cb){
 
 exports.parse = function(html, options){
 	options = options || {};
-	
+
 	var $ = cheerio.load(html);
-	
-	
+
+
 	// Check for xml namespace
 	var namespace,
 		$html = $('html');
-	
+
 	if ($html.length)
 	{
 		var attribKeys = Object.keys($html[0].attribs);
-		
+
 		attribKeys.some(function(attrName){
 			var attrValue = $html.attr(attrName);
-			
+
 			if (attrValue.toLowerCase() === 'http://opengraphprotocol.org/schema/'
 				&& attrName.substring(0, 6) == 'xmlns:')
 			{
@@ -86,8 +89,8 @@ exports.parse = function(html, options){
 	}
 	else if (options.strict)
 		return null;
-	
-	if (!namespace) 
+
+	if (!namespace)
 		// If no namespace is explicitly set..
 		if (options.strict)
 			// and strict mode is specified, abort parse.
@@ -95,26 +98,26 @@ exports.parse = function(html, options){
 		else
 			// and strict mode is not specific, then default to "og"
 			namespace = "og";
-	
+
 	var meta = {},
 		metaTags = $('meta');
-	
+
 	metaTags.each(function() {
 		var element = $(this);
 			propertyAttr = element.attr('property');
-		
+
 		// If meta element isn't an "og:" property, skip it
 		if (!propertyAttr || propertyAttr.substring(0, namespace.length) !== namespace)
 			return;
-		
+
 		var property = propertyAttr.substring(namespace.length+1),
 			content = element.attr('content');
-		
+
 		// If property is a shorthand for a longer property,
 		// Use the full property
 		property = shorthandProperties[property] || property;
-		
-		
+
+
 		var key, tmp,
 			ptr = meta,
 			keys = property.split(':');
@@ -156,6 +159,6 @@ exports.parse = function(html, options){
 			ptr[key] = [ ptr[key], content ];
 		}
 	});
-	
+
 	return meta;
 }
